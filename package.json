@@ -1,5 +1,3 @@
-
-// package.json - Project dependencies and configuration
 {
   "name": "ai-image-segmentation-tool",
   "version": "1.0.0",
@@ -7,7 +5,8 @@
   "main": "index.html",
   "scripts": {
     "start": "python -m http.server 8000",
-    "dev": "python -m http.server 8000"
+    "dev": "python -m http.server 8000",
+    "build": "echo 'No build step required for static site'"
   },
   "keywords": [
     "ai",
@@ -19,5 +18,8 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }
