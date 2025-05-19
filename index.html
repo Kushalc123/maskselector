@@ -1,0 +1,163 @@
+<!-- index.html - Main HTML file for AI Image Segmentation Tool -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Segmentation Tool</title>
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- TensorFlow.js and models -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/deeplab@0.2.1/dist/deeplab.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>AI Image Segmentation Tool</h1>
+            <p>Upload an image, click to select objects, and download the mask</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section - Full Width -->
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="12" y1="18" x2="12" y2="8"></line>
+                        </svg>
+                        <h3>Drop image here or click to browse</h3>
+                        <p>Supports PNG, JPG, JPEG files</p>
+                    </div>
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                </div>
+            </section>
+
+            <!-- Workspace: Left Panel + Canvas -->
+            <div class="workspace" id="workspace" style="display: none;">
+                <!-- Left Panel: Tools -->
+                <aside class="tools-panel">
+                    <div class="tools-container">
+                        <!-- Tool Selection -->
+                        <div class="tool-group">
+                            <label>Selection Tools</label>
+                            <div class="tool-buttons">
+                                <button class="tool-btn active" data-tool="click" title="Click to select">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M3 21L12 12L21 21"></path>
+                                        <path d="M12 3V12"></path>
+                                    </svg>
+                                    AI Click Select
+                                </button>
+                                <button class="tool-btn" data-tool="brush" title="Brush tool">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M9.06 11.9L8.21 20.94A1 1 0 0 1 7.21 22H5.5A1.5 1.5 0 0 1 4 20.5V18a2 2 0 0 1 2-2h2.94a2 2 0 0 1 1.94 1.5"></path>
+                                        <path d="M11 11.4L18.1 4.3a2.1 2.1 0 1 1 3 3L14 14.4"></path>
+                                    </svg>
+                                    Brush Tool
+                                </button>
+                                <button class="tool-btn" data-tool="lasso" title="Lasso tool">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M20.4 12a8.4 8.4 0 1 1-16.8 0"></path>
+                                    </svg>
+                                    Lasso Tool
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Brush Size -->
+                        <div class="tool-group" id="brushSizeGroup" style="display: none;">
+                            <label for="brushSize">Brush Size</label>
+                            <input type="range" id="brushSize" min="5" max="50" value="15">
+                            <span id="brushSizeValue">15px</span>
+                        </div>
+
+                        <!-- Selection Actions -->
+                        <div class="tool-group">
+                            <label>Selection Actions</label>
+                            <div class="action-buttons">
+                                <button class="action-btn" id="undoBtn" title="Undo">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M3 7v6h6"></path>
+                                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                                    </svg>
+                                    Undo
+                                </button>
+                                <button class="action-btn" id="redoBtn" title="Redo">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M21 7v6h-6"></path>
+                                        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+                                    </svg>
+                                    Redo
+                                </button>
+                                <button class="action-btn" id="clearBtn" title="Clear selection">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <polyline points="3,6 5,6 21,6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Clear All
+                                </button>
+                                <button class="action-btn" id="refineBtn" title="Refine edges">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M12 5v14"></path>
+                                        <path d="M5 12h14"></path>
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                    </svg>
+                                    Refine Edges
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Download -->
+                        <div class="tool-group">
+                            <label>Export</label>
+                            <button class="download-btn" id="downloadBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7,10 12,15 17,10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download Mask
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Right Side: Canvas Area -->
+                <main class="canvas-area">
+                    <section class="canvas-section" id="canvasSection">
+                        <div class="canvas-container">
+                            <canvas id="imageCanvas"></canvas>
+                            <canvas id="maskCanvas"></canvas>
+                            <canvas id="overlayCanvas"></canvas>
+                        </div>
+                        <div class="canvas-info">
+                            <span id="canvasInfo">Ready to process...</span>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Loading AI model...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="js/segmentation.js"></script>
+    <script src="js/tools.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

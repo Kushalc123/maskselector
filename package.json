@@ -1,0 +1,23 @@
+
+// package.json - Project dependencies and configuration
+{
+  "name": "ai-image-segmentation-tool",
+  "version": "1.0.0",
+  "description": "Client-side AI image segmentation tool with mask generation",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "dev": "python -m http.server 8000"
+  },
+  "keywords": [
+    "ai",
+    "image-segmentation",
+    "tensorflow",
+    "computer-vision",
+    "web-app"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
