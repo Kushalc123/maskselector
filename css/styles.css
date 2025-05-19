@@ -1,9 +1,4 @@
-/* Focus Styles */
-button:focus-visible,
-input:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
-}/* css/styles.css - Properly scaled UI for 100% zoom Chrome */
+/* css/styles.css - Properly scaled UI for 100% zoom Chrome */
 
 * {
     margin: 0;
@@ -429,11 +424,11 @@ body {
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" fill="none" stroke="red" stroke-width="2"/></svg>') 12 12, crosshair;
 }
 
-/* Magnifier for precision tools */
+/* Enhanced Magnifier for precision tools - Now 216px (20% larger than 180px) */
 .magnifier {
     position: absolute;
-    width: 120px;
-    height: 120px;
+    width: 216px;
+    height: 216px;
     border: 3px solid var(--accent-primary);
     border-radius: 50%;
     background-color: var(--bg-secondary);
@@ -482,4 +477,11 @@ body {
     bottom: 2px;
     width: 1px;
     transform: translateX(-50%);
+}
+
+/* Focus Styles */
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }

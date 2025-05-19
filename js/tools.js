@@ -1,4 +1,4 @@
-// js/tools.js - Interactive tools for mask editing with magnifier
+// js/tools.js - Interactive tools for mask editing with enhanced magnifier
 
 class MaskTools {
     constructor(canvasContainer, maskCanvas, overlayCanvas) {
@@ -8,12 +8,13 @@ class MaskTools {
         this.maskCtx = maskCanvas.getContext('2d');
         this.overlayCtx = overlayCanvas.getContext('2d');
         
-        // Magnifier setup
+        // Enhanced magnifier setup - larger and positioned away from cursor
         this.magnifier = document.getElementById('magnifier');
         this.magnifierCanvas = document.getElementById('magnifierCanvas');
         this.magnifierCtx = this.magnifierCanvas ? this.magnifierCanvas.getContext('2d') : null;
-        this.magnifierSize = 120;
-        this.magnificationLevel = 3; // 3x zoom
+        this.magnifierSize = 216; // 20% larger than 180px (was 180px)
+        this.magnificationLevel = 3; // Keep 3x zoom
+        this.magnifierOffset = 10; // Very close to cursor (10px away)
         if (this.magnifierCanvas) {
             this.magnifierCanvas.width = this.magnifierSize;
             this.magnifierCanvas.height = this.magnifierSize;
@@ -175,7 +176,7 @@ class MaskTools {
     handlePointerMove(e) {
         const point = e.point || this.getMousePos(e);
         
-        // Update magnifier for precision tools
+        // Update magnifier for precision tools - pass the original event
         if (['brush', 'erase', 'lasso', 'lasso-erase'].includes(this.currentTool)) {
             this.updateMagnifier(point, e);
         }
@@ -243,7 +244,7 @@ class MaskTools {
     }
 
     /**
-     * Draw brush stroke on mask canvas
+     * Draw brush stroke on mask canvas with enhanced opacity
      */
     drawBrushStroke(point, isErase = false) {
         this.maskCtx.save();
@@ -252,10 +253,10 @@ class MaskTools {
             // For erasing, remove from mask
             this.maskCtx.globalCompositeOperation = 'destination-out';
         } else {
-            // For adding, draw much brighter and more opaque green
+            // For adding, use darker and more opaque green
             this.maskCtx.globalCompositeOperation = 'source-over';
-            this.maskCtx.fillStyle = 'rgba(0, 255, 50, 0.95)';
-            this.maskCtx.strokeStyle = 'rgba(0, 255, 50, 0.95)';
+            this.maskCtx.fillStyle = 'rgba(0, 180, 20, 0.98)'; // Darker, more opaque green
+            this.maskCtx.strokeStyle = 'rgba(0, 180, 20, 0.98)';
         }
         
         if (this.lastPoint) {
@@ -296,7 +297,7 @@ class MaskTools {
     }
 
     /**
-     * Complete lasso selection
+     * Complete lasso selection with enhanced colors
      */
     completeLasso() {
         if (this.lassoPoints.length < 3) {
@@ -313,9 +314,9 @@ class MaskTools {
             // For lasso erase, use destination-out to remove from existing mask
             this.maskCtx.globalCompositeOperation = 'destination-out';
         } else {
-            // For regular lasso, add much brighter and more opaque green overlay
+            // For regular lasso, use darker and more opaque green
             this.maskCtx.globalCompositeOperation = 'source-over';
-            this.maskCtx.fillStyle = 'rgba(0, 255, 50, 0.95)';
+            this.maskCtx.fillStyle = 'rgba(0, 180, 20, 0.98)'; // Darker, more opaque green
         }
         
         // Draw the lasso selection
@@ -508,47 +509,85 @@ class MaskTools {
     }
 
     /**
-     * Update magnifier position and content
+     * Update magnifier position and content - Canvas-relative positioning
      */
     updateMagnifier(point, event) {
         if (!this.magnifier || !this.magnifierCtx || this.magnifier.style.display === 'none') return;
         
-        // Get the actual mouse position relative to the viewport
-        const rect = this.overlayCanvas.getBoundingClientRect();
-        const clientX = event.clientX || (event.point ? rect.left + (point.x * rect.width / this.overlayCanvas.width) : rect.left + rect.width / 2);
-        const clientY = event.clientY || (event.point ? rect.top + (point.y * rect.height / this.overlayCanvas.height) : rect.top + rect.height / 2);
+        // Get canvas position and dimensions
+        const canvasRect = this.overlayCanvas.getBoundingClientRect();
+        const containerRect = this.canvasContainer.getBoundingClientRect();
         
-        // Position magnifier offset from cursor
-        const offset = 80;
-        let magnifierX = clientX + offset;
-        let magnifierY = clientY - offset;
+        // Convert canvas coordinates to screen coordinates within the canvas
+        const scaleX = canvasRect.width / this.overlayCanvas.width;
+        const scaleY = canvasRect.height / this.overlayCanvas.height;
         
-        // Keep magnifier within viewport bounds
-        if (magnifierX + this.magnifierSize > window.innerWidth) {
-            magnifierX = clientX - offset - this.magnifierSize;
+        // Calculate the actual pixel position on the displayed canvas
+        const canvasPixelX = point.x * scaleX;
+        const canvasPixelY = point.y * scaleY;
+        
+        // Calculate position relative to the canvas container
+        const containerX = canvasPixelX + (canvasRect.left - containerRect.left);
+        const containerY = canvasPixelY + (canvasRect.top - containerRect.top);
+        
+        // Position magnifier close to cursor (10px offset)
+        let magnifierX = containerX + this.magnifierOffset;
+        let magnifierY = containerY - this.magnifierOffset;
+        
+        // Keep magnifier within container bounds
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
+        const margin = 10;
+        
+        // Adjust if goes out of bounds
+        if (magnifierX + this.magnifierSize > containerWidth - margin) {
+            magnifierX = containerX - this.magnifierOffset - this.magnifierSize;
         }
-        if (magnifierY < 0) {
-            magnifierY = clientY + offset;
+        if (magnifierX < margin) {
+            magnifierX = containerX + this.magnifierOffset;
         }
-        if (magnifierY + this.magnifierSize > window.innerHeight) {
-            magnifierY = clientY - offset - this.magnifierSize;
+        if (magnifierY < margin) {
+            magnifierY = containerY + this.magnifierOffset;
+        }
+        if (magnifierY + this.magnifierSize > containerHeight - margin) {
+            magnifierY = containerY - this.magnifierOffset - this.magnifierSize;
         }
         
-        // Set magnifier position
-        this.magnifier.style.left = magnifierX + 'px';
-        this.magnifier.style.top = magnifierY + 'px';
+        // Position relative to container, not page
+        this.magnifier.style.position = 'absolute';
+        this.magnifier.style.left = Math.round(magnifierX) + 'px';
+        this.magnifier.style.top = Math.round(magnifierY) + 'px';
         
-        // Update magnifier content
+        // Update content
         this.drawMagnifiedView(point);
     }
 
     /**
-     * Draw magnified view of the area around the cursor
+     * Draw magnified view with fixed scaling and enhanced lasso indicators
      */
     drawMagnifiedView(point) {
         if (!this.magnifierCtx) return;
         
-        const sourceSize = this.magnifierSize / this.magnificationLevel;
+        // Dynamic magnification based on brush size for brush/erase tools
+        let effectiveMagnification = this.magnificationLevel;
+        if (this.currentTool === 'brush' || this.currentTool === 'erase') {
+            // Scale magnification properly for the full brush range (5-200px)
+            const minMag = 1.5;
+            const maxMag = 4.5;
+            const minBrush = 5;
+            const maxBrush = 200;
+            
+            // Clamp brush size to valid range
+            const clampedBrushSize = Math.max(minBrush, Math.min(maxBrush, this.brushSize));
+            
+            // Calculate normalized position (0 to 1)
+            const normalizedBrushSize = (clampedBrushSize - minBrush) / (maxBrush - minBrush);
+            
+            // Inverse relationship: larger brush = less magnification (more context)
+            effectiveMagnification = maxMag - (normalizedBrushSize * (maxMag - minMag));
+        }
+        
+        const sourceSize = this.magnifierSize / effectiveMagnification;
         const halfSize = sourceSize / 2;
         
         // Calculate source area to capture
@@ -572,8 +611,8 @@ class MaskTools {
             compositeCtx.drawImage(imageCanvas, 0, 0);
         }
         
-        // Draw mask layer with reduced opacity
-        compositeCtx.globalAlpha = 0.6;
+        // Draw mask layer with enhanced visibility
+        compositeCtx.globalAlpha = 0.7;
         compositeCtx.globalCompositeOperation = 'screen';
         compositeCtx.drawImage(this.maskCanvas, 0, 0);
         
@@ -583,27 +622,73 @@ class MaskTools {
         compositeCtx.drawImage(this.overlayCanvas, 0, 0);
         
         // Draw the magnified portion
-        this.magnifierCtx.imageSmoothingEnabled = false; // Keep crisp pixels
+        this.magnifierCtx.imageSmoothingEnabled = false;
         this.magnifierCtx.drawImage(
             compositeCanvas,
             sourceX, sourceY, sourceWidth, sourceHeight,
             0, 0, this.magnifierSize, this.magnifierSize
         );
         
-        // Draw brush preview circle if brush tool is active
+        // Draw center indicators based on current tool
+        const centerX = this.magnifierSize / 2;
+        const centerY = this.magnifierSize / 2;
+        
+        this.magnifierCtx.save();
+        
         if (this.currentTool === 'brush' || this.currentTool === 'erase') {
-            const centerX = this.magnifierSize / 2;
-            const centerY = this.magnifierSize / 2;
-            const brushRadius = (this.brushSize / 2) * this.magnificationLevel;
+            // Draw brush circle that scales with brush size AND magnification
+            const brushRadius = (this.brushSize / 2) * effectiveMagnification;
             
             this.magnifierCtx.strokeStyle = this.currentTool === 'erase' ? '#ef4444' : '#10b981';
-            this.magnifierCtx.lineWidth = 2;
-            this.magnifierCtx.setLineDash([4, 4]);
+            this.magnifierCtx.lineWidth = 3;
+            this.magnifierCtx.setLineDash([7, 7]); // 20% larger dashes
             this.magnifierCtx.beginPath();
             this.magnifierCtx.arc(centerX, centerY, brushRadius, 0, 2 * Math.PI);
             this.magnifierCtx.stroke();
             this.magnifierCtx.setLineDash([]);
+            
+            // Add center crosshair for precise positioning
+            this.magnifierCtx.strokeStyle = this.currentTool === 'erase' ? '#ef4444' : '#10b981';
+            this.magnifierCtx.lineWidth = 2;
+            this.magnifierCtx.beginPath();
+            // Horizontal line
+            this.magnifierCtx.moveTo(centerX - 12, centerY);
+            this.magnifierCtx.lineTo(centerX + 12, centerY);
+            // Vertical line
+            this.magnifierCtx.moveTo(centerX, centerY - 12);
+            this.magnifierCtx.lineTo(centerX, centerY + 12);
+            this.magnifierCtx.stroke();
+            
+        } else if (this.currentTool === 'lasso' || this.currentTool === 'lasso-erase') {
+            // Draw crosshair for lasso tools - 20% larger
+            this.magnifierCtx.strokeStyle = this.currentTool === 'lasso-erase' ? '#ef4444' : '#10b981';
+            this.magnifierCtx.lineWidth = 2.4; // 20% larger (was 2)
+            this.magnifierCtx.setLineDash([4.8, 4.8]); // 20% larger dashes (was 4, 4)
+            this.magnifierCtx.beginPath();
+            // Horizontal line - 20% longer
+            this.magnifierCtx.moveTo(centerX - 18, centerY);
+            this.magnifierCtx.lineTo(centerX + 18, centerY);
+            // Vertical line - 20% longer
+            this.magnifierCtx.moveTo(centerX, centerY - 18);
+            this.magnifierCtx.lineTo(centerX, centerY + 18);
+            this.magnifierCtx.stroke();
+            this.magnifierCtx.setLineDash([]);
+            
+            // Add center dot for precision - 20% larger
+            this.magnifierCtx.fillStyle = this.currentTool === 'lasso-erase' ? '#ef4444' : '#10b981';
+            this.magnifierCtx.beginPath();
+            this.magnifierCtx.arc(centerX, centerY, 3.6, 0, 2 * Math.PI); // 20% larger (was 3)
+            this.magnifierCtx.fill();
+            
+            // Add outer circle for reference - 20% larger
+            this.magnifierCtx.strokeStyle = this.currentTool === 'lasso-erase' ? '#ef4444' : '#10b981';
+            this.magnifierCtx.lineWidth = 1.2; // 20% larger (was 1)
+            this.magnifierCtx.beginPath();
+            this.magnifierCtx.arc(centerX, centerY, 9.6, 0, 2 * Math.PI); // 20% larger (was 8)
+            this.magnifierCtx.stroke();
         }
+        
+        this.magnifierCtx.restore();
     }
 
     /**
@@ -666,14 +751,14 @@ class MaskTools {
     }
 
     /**
-     * Apply AI segmentation result to mask
+     * Apply AI segmentation result to mask with enhanced colors
      */
     applySegmentation(imageData, additive = true) {
         if (!additive) {
             this.clearMask();
         }
         
-        // Convert white mask to much brighter green for display
+        // Convert white mask to darker, more opaque green for display
         const greenImageData = this.convertToGreenOverlay(imageData);
         
         this.maskCtx.save();
@@ -694,7 +779,7 @@ class MaskTools {
     }
 
     /**
-     * Convert white mask to bright green overlay for display
+     * Convert white mask to enhanced dark green overlay for better visibility
      */
     convertToGreenOverlay(imageData) {
         const data = new Uint8ClampedArray(imageData.data);
@@ -702,9 +787,9 @@ class MaskTools {
         for (let i = 0; i < data.length; i += 4) {
             if (data[i] > 128) { // If white (selected)
                 data[i] = 0;       // R - no red
-                data[i + 1] = 255; // G - full bright green
-                data[i + 2] = 50;  // B - slight blue for better visibility
-                data[i + 3] = 240; // A - much more opaque
+                data[i + 1] = 180; // G - darker green (reduced from 255)
+                data[i + 2] = 20;  // B - less blue for darker appearance
+                data[i + 3] = 250; // A - more opaque (increased from 240)
             } else {
                 data[i + 3] = 0; // Fully transparent for non-selected areas
             }
@@ -764,7 +849,8 @@ class MaskTools {
             canUndo: this.canUndo(),
             canRedo: this.canRedo(),
             isLassoActive: this.isLassoActive,
-            lassoPointsCount: this.lassoPoints.length
+            lassoPointsCount: this.lassoPoints.length,
+            magnifierSize: this.magnifierSize
         };
     }
 
