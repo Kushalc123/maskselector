@@ -1,6 +1,10 @@
-/* css/styles.css - Dark mode styling for AI Image Segmentation Tool */
+/* Focus Styles */
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}/* css/styles.css - Properly scaled UI for 100% zoom Chrome */
 
-/* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -8,7 +12,6 @@
 }
 
 :root {
-    /* Dark mode color palette */
     --bg-primary: #0f0f0f;
     --bg-secondary: #1a1a1a;
     --bg-tertiary: #2a2a2a;
@@ -22,32 +25,30 @@
     --warning-color: #f59e0b;
     --error-color: #ef4444;
     
-    /* Spacing */
+    /* Properly scaled spacing for 100% zoom */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-xxl: 3rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.25rem;
     
     /* Border radius */
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --radius-xl: 1rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
     
     /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.4;
     min-height: 100vh;
+    font-size: 14px; /* Readable base font size */
 }
 
 /* App Container */
@@ -57,19 +58,18 @@ body {
     flex-direction: column;
 }
 
-/* Header Styles */
+/* Compact but readable Header */
 .app-header {
     background-color: var(--bg-secondary);
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
     text-align: center;
     border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
 }
 
 .app-header h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: var(--spacing-sm);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -78,30 +78,29 @@ body {
 
 .app-header p {
     color: var(--text-secondary);
-    font-size: 1rem;
+    font-size: 0.875rem;
 }
 
 /* Main Content */
 .main-content {
     flex: 1;
-    padding: var(--spacing-xl);
-    max-width: 1200px;
-    margin: 0 auto;
+    padding: var(--spacing-sm);
     width: 100%;
+    min-height: 0;
 }
 
 /* Upload Section */
 .upload-section {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
 }
 
 .upload-area {
     border: 2px dashed var(--border-color);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-xxl);
+    padding: var(--spacing-xl);
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     background-color: var(--bg-secondary);
 }
 
@@ -113,7 +112,6 @@ body {
 .upload-area.dragover {
     border-color: var(--accent-primary);
     background-color: var(--bg-tertiary);
-    transform: scale(1.02);
 }
 
 .upload-content {
@@ -121,30 +119,40 @@ body {
 }
 
 .upload-icon {
-    width: 64px;
-    height: 64px;
+    width: 48px;
+    height: 48px;
     color: var(--text-muted);
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
 }
 
 .upload-content h3 {
-    font-size: 1.25rem;
-    margin-bottom: var(--spacing-sm);
+    font-size: 1rem;
+    margin-bottom: var(--spacing-xs);
     color: var(--text-primary);
 }
 
 .upload-content p {
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
 }
 
-/* Tools Section */
+/* Workspace */
+.workspace {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    height: calc(100vh - 140px);
+    min-height: 0;
+}
+
+/* Tools Section - Properly sized */
 .tools-section {
     background-color: var(--bg-secondary);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
-    box-shadow: var(--shadow-md);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    order: 1;
+    flex-shrink: 0;
 }
 
 .tools-container {
@@ -158,60 +166,76 @@ body {
 .tool-group {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 .tool-group label {
     font-weight: 500;
     color: var(--text-secondary);
-    white-space: nowrap;
+    font-size: 0.875rem;
+    margin-right: var(--spacing-xs);
 }
 
-/* Tool Buttons */
-.tool-buttons {
+/* Properly sized Tool Buttons */
+.tool-buttons,
+.action-buttons {
     display: flex;
     gap: var(--spacing-sm);
 }
 
-.tool-btn {
+.tool-btn,
+.action-btn {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    font-size: 0.8rem;
     font-weight: 500;
+    white-space: nowrap;
+    min-height: 32px; /* Ensure minimum clickable area */
 }
 
-.tool-btn:hover {
+.tool-btn:hover,
+.action-btn:hover {
     background-color: var(--accent-primary);
     border-color: var(--accent-primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
 }
 
 .tool-btn.active {
     background-color: var(--accent-primary);
     border-color: var(--accent-primary);
-    box-shadow: var(--shadow-md);
 }
 
-.tool-btn svg {
+.tool-btn:disabled,
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.tool-btn svg,
+.action-btn svg {
     width: 16px;
     height: 16px;
 }
 
-/* Brush Size Control */
+/* Brush Size Control - Properly sized */
+#brushSizeGroup {
+    align-items: center;
+}
+
 #brushSize {
     width: 100px;
+    height: 6px;
     -webkit-appearance: none;
     appearance: none;
-    height: 6px;
     border-radius: 3px;
     background: var(--border-color);
     outline: none;
@@ -225,95 +249,59 @@ body {
     border-radius: 50%;
     background: var(--accent-primary);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 
 #brushSize::-webkit-slider-thumb:hover {
     background: var(--accent-secondary);
-    transform: scale(1.2);
+    transform: scale(1.1);
 }
 
 #brushSizeValue {
     color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    margin-left: var(--spacing-sm);
     min-width: 40px;
 }
 
-/* Action Buttons */
-.action-buttons {
-    display: flex;
-    gap: var(--spacing-sm);
-}
-
-.action-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.action-btn:hover {
-    background-color: var(--accent-primary);
-    border-color: var(--accent-primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.action-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.action-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-/* Download Button */
+/* Download Button - Properly sized */
 .download-btn {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: var(--spacing-md) var(--spacing-xl);
+    padding: var(--spacing-sm) var(--spacing-lg);
     border: none;
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, var(--success-color), #059669);
     color: white;
     cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1rem;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
     font-weight: 600;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
+    min-height: 36px;
 }
 
 .download-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
     background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
 }
 
 .download-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
-/* Canvas Section */
+/* Canvas Section - 20% bigger */
 .canvas-section {
     background-color: var(--bg-secondary);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-md);
-    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-xs);
+    box-shadow: var(--shadow-sm);
+    order: 2;
+    flex: 1;
+    min-height: 0;
+    height: calc(100vh - 120px); /* Reduced UI overhead for bigger image */
 }
 
 .canvas-container {
@@ -321,15 +309,13 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 400px;
+    height: 100%;
+    width: 100%;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     background-color: var(--bg-tertiary);
-    /* Allow page scrolling instead of container scrolling */
-    overflow: visible;
-    width: 100%;
-    /* Set a reasonable max width to prevent layout breaking */
-    max-width: 100%;
+    overflow: hidden;
+    min-height: calc(100vh - 130px);
 }
 
 .canvas-container canvas {
@@ -337,12 +323,11 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-md);
-    /* Ensure canvases don't break out of container on mobile */
-    max-width: calc(100vw - 4rem);
-    max-height: calc(100vh - 300px);
+    /* Allow even larger canvases */
+    max-width: 99vw;
+    max-height: 94vh;
     object-fit: contain;
+    border-radius: var(--radius-sm);
 }
 
 #imageCanvas {
@@ -352,7 +337,6 @@ body {
 #maskCanvas {
     z-index: 2;
     opacity: 0.6;
-    /* Create green overlay effect */
     mix-blend-mode: screen;
 }
 
@@ -362,10 +346,10 @@ body {
 }
 
 .canvas-info {
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-xs);
     text-align: center;
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.75rem;
 }
 
 /* Loading Overlay */
@@ -387,17 +371,17 @@ body {
     padding: var(--spacing-xl);
     background-color: var(--bg-secondary);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-md);
 }
 
 .spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid var(--border-color);
-    border-top: 4px solid var(--accent-primary);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto var(--spacing-md);
+    margin: 0 auto var(--spacing-sm);
 }
 
 @keyframes spin {
@@ -407,152 +391,95 @@ body {
 
 .loading-content p {
     color: var(--text-secondary);
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 500;
 }
 
 /* Responsive Design */
-@media (max-width: 1024px) {
-    .workspace {
-        flex-direction: column;
-    }
-    
-    .tools-panel {
-        width: 100%;
-        max-height: none;
-        order: 2; /* Put tools below canvas on mobile */
-    }
-    
-    .canvas-area {
-        order: 1;
-    }
-    
+@media (max-width: 768px) {
     .tools-container {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: var(--spacing-md);
-    }
-    
-    .tool-group {
-        flex-direction: row;
-        align-items: center;
+        flex-direction: column;
         gap: var(--spacing-sm);
     }
     
-    .tool-buttons,
-    .action-buttons {
-        grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-    }
-}
-
-@media (max-width: 768px) {
-    .main-content {
-        padding: var(--spacing-md);
-    }
-    
-    .app-header {
-        padding: var(--spacing-md);
-    }
-    
-    .app-header h1 {
-        font-size: 1.75rem;
-    }
-    
-    .canvas-container {
-        min-height: 300px;
-    }
-    
-    .upload-area {
-        padding: var(--spacing-xl);
-    }
-    
-    .upload-icon {
-        width: 48px;
-        height: 48px;
-    }
-    
-    .tools-panel {
-        padding: var(--spacing-md);
-    }
-}
-
-@media (max-width: 480px) {
-    .tool-btn,
-    .action-btn {
-        padding: var(--spacing-sm);
-        font-size: 0.75rem;
-        min-width: 60px;
-    }
-    
-    .tool-btn svg,
-    .action-btn svg {
-        width: 14px;
-        height: 14px;
-    }
-    
-    .download-btn {
-        padding: var(--spacing-sm) var(--spacing-lg);
-        font-size: 0.875rem;
+    .tool-group {
         width: 100%;
+        justify-content: center;
     }
     
-    .download-btn svg {
-        width: 18px;
-        height: 18px;
+    .canvas-section {
+        height: calc(100vh - 140px);
     }
 }
 
-/* Cursor Styles for Different Tools */
+/* Cursor Styles - Properly sized for visibility */
 .canvas-container.tool-brush {
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="white" stroke-width="2"/></svg>') 10 10, crosshair;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="2"/></svg>') 12 12, crosshair;
+}
+
+.canvas-container.tool-erase {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><rect x="6" y="9" width="12" height="6" fill="none" stroke="white" stroke-width="2"/></svg>') 12 12, crosshair;
 }
 
 .canvas-container.tool-lasso {
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="M10 2L2 18h16L10 2z" fill="none" stroke="white" stroke-width="2"/></svg>') 10 10, crosshair;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" fill="none" stroke="white" stroke-width="2"/></svg>') 12 12, crosshair;
 }
 
-/* Selection Feedback */
-.selection-feedback {
+.canvas-container.tool-lasso-erase {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" fill="none" stroke="red" stroke-width="2"/></svg>') 12 12, crosshair;
+}
+
+/* Magnifier for precision tools */
+.magnifier {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: var(--bg-tertiary);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-md);
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    border: 1px solid var(--border-color);
-    z-index: 10;
+    width: 120px;
+    height: 120px;
+    border: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    z-index: 1000;
+    overflow: hidden;
 }
 
-/* Accessibility Improvements */
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
-    
-    .spinner {
-        animation: none;
-    }
+.magnifier canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
 }
 
-/* Focus Styles for Accessibility */
-button:focus-visible,
-input:focus-visible {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
+.magnifier-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--text-primary);
+    border-radius: 50%;
+    pointer-events: none;
 }
 
-/* Print Styles */
-@media print {
-    .loading-overlay,
-    .tools-section {
-        display: none !important;
-    }
+.magnifier-crosshair::before,
+.magnifier-crosshair::after {
+    content: '';
+    position: absolute;
+    background-color: var(--text-primary);
+}
+
+.magnifier-crosshair::before {
+    top: 50%;
+    left: 2px;
+    right: 2px;
+    height: 1px;
+    transform: translateY(-50%);
+}
+
+.magnifier-crosshair::after {
+    left: 50%;
+    top: 2px;
+    bottom: 2px;
+    width: 1px;
+    transform: translateX(-50%);
 }

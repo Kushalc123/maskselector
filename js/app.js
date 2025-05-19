@@ -1,4 +1,4 @@
-// js/app.js - Main application logic for AI Image Segmentation Tool
+// js/app.js - Main application logic with Enhanced AI Image Segmentation
 
 class ImageSegmentationApp {
     constructor() {
@@ -30,6 +30,7 @@ class ImageSegmentationApp {
         this.redoBtn = document.getElementById('redoBtn');
         this.clearBtn = document.getElementById('clearBtn');
         this.refineBtn = document.getElementById('refineBtn');
+        this.invertBtn = document.getElementById('invertBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         
         // App state
@@ -40,12 +41,16 @@ class ImageSegmentationApp {
         this.isShowingPreview = false;
         this.cachedSegmentation = null;
         this.previewTimeout = null;
+        this.isCtrlPressed = false;
+        this.clickCount = 0; // Track number of AI selections made
         
         // Bind methods to preserve context
         this.handleFileSelect = this.handleFileSelect.bind(this);
         this.handleDragEvents = this.handleDragEvents.bind(this);
         this.handleToolChange = this.handleToolChange.bind(this);
         this.handleCanvasClick = this.handleCanvasClick.bind(this);
+        this.handleKeyDown = this.handleKeyDown.bind(this);
+        this.handleKeyUp = this.handleKeyUp.bind(this);
         
         this.initializeApp();
     }
@@ -53,15 +58,15 @@ class ImageSegmentationApp {
     async initializeApp() {
         try {
             this.setupEventListeners();
-            this.updateCanvasInfo('Initializing AI model...');
+            this.updateCanvasInfo('Initializing enhanced AI model...');
             
             // Load AI model
             await this.segmentation.initializeModel();
             this.modelLoaded = true;
             this.hideLoadingOverlay();
-            this.updateCanvasInfo('Model loaded. Upload an image to begin.');
+            this.updateCanvasInfo('Enhanced AI model loaded. Upload an image to begin.');
             
-            console.log('App initialized successfully');
+            console.log('Enhanced app initialized successfully');
         } catch (error) {
             console.error('Failed to initialize app:', error);
             this.hideLoadingOverlay();
@@ -99,6 +104,7 @@ class ImageSegmentationApp {
         this.redoBtn.addEventListener('click', () => this.handleRedo());
         this.clearBtn.addEventListener('click', () => this.handleClear());
         this.refineBtn.addEventListener('click', () => this.handleRefine());
+        this.invertBtn.addEventListener('click', () => this.handleInvert());
         this.downloadBtn.addEventListener('click', () => this.handleDownload());
         
         // Canvas events for AI segmentation and preview
@@ -106,25 +112,34 @@ class ImageSegmentationApp {
         this.overlayCanvas.addEventListener('mousemove', this.handleCanvasMouseMove.bind(this));
         this.overlayCanvas.addEventListener('mouseleave', this.handleCanvasMouseLeave.bind(this));
         
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                switch (e.key) {
-                    case 'z':
-                        e.preventDefault();
-                        if (e.shiftKey) {
-                            this.handleRedo();
-                        } else {
-                            this.handleUndo();
-                        }
-                        break;
-                    case 'y':
-                        e.preventDefault();
+        // Keyboard events for modifier keys
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('keyup', this.handleKeyUp);
+    }
+
+    handleKeyDown(e) {
+        this.isCtrlPressed = e.ctrlKey || e.metaKey;
+        
+        if (this.isCtrlPressed) {
+            switch (e.key) {
+                case 'z':
+                    e.preventDefault();
+                    if (e.shiftKey) {
                         this.handleRedo();
-                        break;
-                }
+                    } else {
+                        this.handleUndo();
+                    }
+                    break;
+                case 'y':
+                    e.preventDefault();
+                    this.handleRedo();
+                    break;
             }
-        });
+        }
+    }
+
+    handleKeyUp(e) {
+        this.isCtrlPressed = e.ctrlKey || e.metaKey;
     }
 
     handleFileSelect(e) {
@@ -207,9 +222,10 @@ class ImageSegmentationApp {
         try {
             this.currentImage = img;
             
-            // Clear any cached segmentation from previous image
+            // Reset state for new image
             this.cachedSegmentation = null;
             this.hideClickPreview();
+            this.clickCount = 0;
             
             // Use exact original image dimensions
             const width = img.naturalWidth || img.width;
@@ -266,14 +282,14 @@ class ImageSegmentationApp {
                 this.overlayCanvas
             );
             
-            // Show workspace instead of individual sections
+            // Show workspace
             const workspace = document.getElementById('workspace');
             workspace.style.display = 'flex';
             
             // Update UI
             this.updateToolButtons();
             const scalePercent = Math.round(scale * 100);
-            this.updateCanvasInfo(`Image: ${width}×${height} (displayed at ${scalePercent}%)`);
+            this.updateCanvasInfo(`Image: ${width}×${height} (displayed at ${scalePercent}%) - Ready for AI selection`);
             this.hideLoadingOverlay();
             
             console.log('Canvas setup completed');
@@ -291,12 +307,17 @@ class ImageSegmentationApp {
         this.toolButtons.forEach(btn => btn.classList.remove('active'));
         e.currentTarget.classList.add('active');
         
-        // Show/hide brush size control
-        this.brushSizeGroup.style.display = tool === 'brush' ? 'block' : 'none';
+        // Show/hide brush size control for brush, erase tools
+        this.brushSizeGroup.style.display = (tool === 'brush' || tool === 'erase') ? 'flex' : 'none';
         
         // Set tool in mask tools
         if (this.maskTools) {
             this.maskTools.setTool(tool);
+        }
+        
+        // Reset click count when switching tools
+        if (tool === 'click') {
+            this.clickCount = 0;
         }
         
         // Update canvas info
@@ -306,11 +327,15 @@ class ImageSegmentationApp {
     getToolDescription(tool) {
         switch (tool) {
             case 'click':
-                return 'Click on objects to select them with AI';
+                return `Enhanced AI Click Select (${this.clickCount} selections made) - Click to add, Ctrl+Click to remove`;
             case 'brush':
-                return 'Paint to add to selection (Shift+click to erase)';
+                return 'Paint to add to selection';
+            case 'erase':
+                return 'Paint to remove from selection';
             case 'lasso':
-                return 'Draw around objects to select them';
+                return 'Draw around objects to add to selection';
+            case 'lasso-erase':
+                return 'Draw around areas to remove from selection (perfect for ring holes)';
             default:
                 return 'Select a tool to begin editing';
         }
@@ -329,7 +354,7 @@ class ImageSegmentationApp {
         // Debounce the preview to avoid too many requests
         clearTimeout(this.previewTimeout);
         this.previewTimeout = setTimeout(() => {
-            this.showClickPreview(e);
+            this.showEnhancedClickPreview(e);
         }, 150);
     }
 
@@ -340,7 +365,7 @@ class ImageSegmentationApp {
         this.hideClickPreview();
     }
 
-    async showClickPreview(e) {
+    async showEnhancedClickPreview(e) {
         if (this.isProcessing || !this.segmentation || this.isShowingPreview) {
             return;
         }
@@ -353,14 +378,14 @@ class ImageSegmentationApp {
 
             this.isShowingPreview = true;
 
-            // Use cached segmentation if available, otherwise segment
+            // Use cached segmentation if available, otherwise generate
             if (!this.cachedSegmentation) {
                 console.log('Generating segmentation for preview...');
                 this.cachedSegmentation = await this.segmentation.segmentImage(this.imageCanvas);
             }
 
-            // Create preview mask
-            const previewMask = this.segmentation.createClickMask(this.cachedSegmentation.imageData, x, y);
+            // Create preview mask using simplified method
+            const previewMask = this.segmentation.createClickMask(this.cachedSegmentation, x, y);
             
             // Draw preview on overlay canvas
             const overlayCtx = this.overlayCanvas.getContext('2d');
@@ -373,13 +398,15 @@ class ImageSegmentationApp {
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(previewMask, 0, 0);
             
-            // Draw preview with blue tint - only show the actual selection, not the whole image
+            // Draw preview with green tint for add, red for remove
             overlayCtx.save();
             overlayCtx.globalCompositeOperation = 'source-over';
-            overlayCtx.globalAlpha = 0.5;
+            overlayCtx.globalAlpha = 0.6; // More opaque for better visibility
             
-            // Use blue color for preview
-            overlayCtx.fillStyle = '#3b82f6';
+            // Check if we're in add mode (default) or remove mode (Ctrl pressed)
+            const color = this.isCtrlPressed ? '#ef4444' : '#10b981'; // Red for remove, green for add
+            
+            overlayCtx.fillStyle = color;
             overlayCtx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
             
             // Only show where the mask is
@@ -416,16 +443,16 @@ class ImageSegmentationApp {
         try {
             this.isProcessing = true;
             this.hideClickPreview();
-            this.showLoadingOverlay('Analyzing image...');
+            this.showLoadingOverlay('AI analyzing image...');
             
             // Get click coordinates
             const rect = this.overlayCanvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) * (this.overlayCanvas.width / rect.width);
             const y = (e.clientY - rect.top) * (this.overlayCanvas.height / rect.height);
             
-            console.log(`Click at: ${x}, ${y}`);
+            console.log(`Enhanced AI click at: ${x}, ${y}, Ctrl pressed: ${this.isCtrlPressed}`);
             
-            // Use cached segmentation or generate new one
+            // Use cached enhanced segmentation or generate new one
             let segmentationResult;
             if (this.cachedSegmentation) {
                 segmentationResult = this.cachedSegmentation;
@@ -434,17 +461,8 @@ class ImageSegmentationApp {
                 this.cachedSegmentation = segmentationResult;
             }
             
-            const segmentationData = segmentationResult.imageData;
-            
-            // Check if click hit existing mask (to toggle selection)
-            const maskData = this.maskTools.getMaskData();
-            const pixelIndex = (Math.floor(y) * maskData.width + Math.floor(x)) * 4;
-            const isInSelection = maskData.data[pixelIndex] > 128;
-            
-            console.log('Is in selection:', isInSelection);
-            
-            // Create mask for clicked object using the segmentation module
-            const objectMask = this.segmentation.createClickMask(segmentationData, x, y);
+            // Create mask for clicked object using simplified connected components
+            const objectMask = this.segmentation.createClickMask(segmentationResult, x, y);
             
             // Check if the mask has any selection
             const maskDataArray = objectMask.data;
@@ -457,26 +475,31 @@ class ImageSegmentationApp {
             }
             
             if (hasSelection) {
-                if (isInSelection) {
-                    // Remove from selection
+                this.clickCount++;
+                
+                if (this.isCtrlPressed) {
+                    // Remove from selection (subtract mode)
                     this.subtractMaskFromSelection(objectMask);
-                    console.log('Removed selection');
+                    console.log(`Removed selection #${this.clickCount} from mask`);
                 } else {
-                    // Add to selection
+                    // Add to selection (additive mode)
                     this.maskTools.applySegmentation(objectMask, true);
-                    console.log('Added to selection');
+                    console.log(`Added selection #${this.clickCount} to mask`);
                 }
+                
+                // Update tool description with click count
+                this.updateCanvasInfo(this.getToolDescription('click'));
             } else {
-                console.log('Clicked on background - no changes made');
+                console.log('Clicked area produced no selection - try clicking on a different part');
+                this.updateCanvasInfo('No selection at click point - try clicking on object edges or different areas');
             }
             
             this.hideLoadingOverlay();
-            this.updateCanvasInfo('Selection updated');
             
         } catch (error) {
-            console.error('AI segmentation failed:', error);
+            console.error('Enhanced AI segmentation failed:', error);
             this.hideLoadingOverlay();
-            this.showError(`AI segmentation failed: ${error.message}`);
+            this.showError(`Enhanced AI segmentation failed: ${error.message}`);
         } finally {
             this.isProcessing = false;
         }
@@ -499,8 +522,50 @@ class ImageSegmentationApp {
     handleClear() {
         if (this.maskTools) {
             this.maskTools.clearMask();
+            this.clickCount = 0; // Reset click count
             this.updateToolButtons();
             this.updateCanvasInfo('Selection cleared');
+        }
+    }
+
+    handleInvert() {
+        if (!this.maskTools) return;
+        
+        try {
+            this.showLoadingOverlay('Inverting mask...');
+            
+            // Get current mask data
+            const currentMask = this.maskTools.getMaskData();
+            const data = currentMask.data;
+            
+            // Invert the mask: white becomes black, black becomes white
+            for (let i = 0; i < data.length; i += 4) {
+                const currentValue = data[i]; // R channel
+                const invertedValue = 255 - currentValue;
+                
+                data[i] = invertedValue;
+                data[i + 1] = invertedValue;
+                data[i + 2] = invertedValue;
+            }
+            
+            // Apply inverted mask
+            const maskCtx = this.maskCanvas.getContext('2d');
+            maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+            
+            // Convert to green overlay for display
+            const greenMask = this.maskTools.convertToGreenOverlay(currentMask);
+            maskCtx.putImageData(greenMask, 0, 0);
+            
+            this.maskTools.saveState();
+            this.updateToolButtons();
+            
+            this.hideLoadingOverlay();
+            this.updateCanvasInfo('Mask inverted');
+            
+        } catch (error) {
+            console.error('Mask inversion failed:', error);
+            this.hideLoadingOverlay();
+            this.showError('Failed to invert mask. Please try again.');
         }
     }
 
@@ -508,74 +573,52 @@ class ImageSegmentationApp {
         if (!this.maskTools) return;
         
         try {
-            this.showLoadingOverlay('Refining edges...');
+            this.showLoadingOverlay('Refining edges with enhanced algorithm...');
             
-            // Simple edge refinement using canvas operations
+            // Enhanced edge refinement
             const currentMask = this.maskTools.getMaskData();
-            const refinedMask = this.refineMaskEdges(currentMask);
+            const refinedMask = this.refineMaskEdgesEnhanced(currentMask);
             
             // Apply refined mask
             const maskCtx = this.maskCanvas.getContext('2d');
-            maskCtx.putImageData(refinedMask, 0, 0);
+            maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+            
+            // Convert to green overlay for display
+            const greenMask = this.maskTools.convertToGreenOverlay(refinedMask);
+            maskCtx.putImageData(greenMask, 0, 0);
+            
             this.maskTools.saveState();
             
             this.hideLoadingOverlay();
-            this.updateCanvasInfo('Edges refined');
+            this.updateCanvasInfo('Edges refined with enhanced algorithm');
             
         } catch (error) {
-            console.error('Edge refinement failed:', error);
+            console.error('Enhanced edge refinement failed:', error);
             this.hideLoadingOverlay();
             this.showError('Edge refinement failed. Please try again.');
         }
     }
 
-    refineMaskEdges(maskData, iterations = 1) {
+    refineMaskEdgesEnhanced(maskData, iterations = 2) {
         const width = maskData.width;
         const height = maskData.height;
         const data = new Uint8ClampedArray(maskData.data);
         
-        // Apply closing operation (dilation followed by erosion)
+        // Enhanced morphological operations
         for (let iter = 0; iter < iterations; iter++) {
-            // Dilation
-            const dilated = new Uint8ClampedArray(data);
+            // Erosion to remove noise
+            const eroded = new Uint8ClampedArray(data);
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
                     const idx = (y * width + x) * 4;
-                    if (data[idx] > 128) continue;
-                    
-                    // Check 3x3 neighborhood
-                    let hasWhiteNeighbor = false;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            const neighborIdx = ((y + dy) * width + (x + dx)) * 4;
-                            if (data[neighborIdx] > 128) {
-                                hasWhiteNeighbor = true;
-                                break;
-                            }
-                        }
-                        if (hasWhiteNeighbor) break;
-                    }
-                    
-                    if (hasWhiteNeighbor) {
-                        dilated[idx] = 255;
-                        dilated[idx + 1] = 255;
-                        dilated[idx + 2] = 255;
-                    }
-                }
-            }
-            
-            // Erosion
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = (y * width + x) * 4;
-                    if (dilated[idx] < 128) continue;
+                    if (data[idx] < 128) continue;
                     
                     // Check 3x3 neighborhood
                     let hasBlackNeighbor = false;
                     for (let dy = -1; dy <= 1; dy++) {
                         for (let dx = -1; dx <= 1; dx++) {
                             const neighborIdx = ((y + dy) * width + (x + dx)) * 4;
-                            if (dilated[neighborIdx] < 128) {
+                            if (data[neighborIdx] < 128) {
                                 hasBlackNeighbor = true;
                                 break;
                             }
@@ -584,13 +627,40 @@ class ImageSegmentationApp {
                     }
                     
                     if (hasBlackNeighbor) {
-                        data[idx] = 0;
-                        data[idx + 1] = 0;
-                        data[idx + 2] = 0;
+                        eroded[idx] = 0;
+                        eroded[idx + 1] = 0;
+                        eroded[idx + 2] = 0;
+                    }
+                }
+            }
+            
+            // Dilation to restore size
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = (y * width + x) * 4;
+                    if (eroded[idx] > 128) continue;
+                    
+                    // Check 3x3 neighborhood
+                    let hasWhiteNeighbor = false;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const neighborIdx = ((y + dy) * width + (x + dx)) * 4;
+                            if (eroded[neighborIdx] > 128) {
+                                hasWhiteNeighbor = true;
+                                break;
+                            }
+                        }
+                        if (hasWhiteNeighbor) break;
+                    }
+                    
+                    if (hasWhiteNeighbor) {
+                        data[idx] = 255;
+                        data[idx + 1] = 255;
+                        data[idx + 2] = 255;
                     } else {
-                        data[idx] = dilated[idx];
-                        data[idx + 1] = dilated[idx + 1];
-                        data[idx + 2] = dilated[idx + 2];
+                        data[idx] = eroded[idx];
+                        data[idx + 1] = eroded[idx + 1];
+                        data[idx + 2] = eroded[idx + 2];
                     }
                 }
             }
@@ -607,7 +677,10 @@ class ImageSegmentationApp {
         tempCanvas.width = objectMask.width;
         tempCanvas.height = objectMask.height;
         const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.putImageData(objectMask, 0, 0);
+        
+        // Convert to green overlay for subtraction
+        const greenMask = this.maskTools.convertToGreenOverlay(objectMask);
+        tempCtx.putImageData(greenMask, 0, 0);
         
         // Use destination-out blend mode to subtract
         maskCtx.save();
@@ -643,13 +716,13 @@ class ImageSegmentationApp {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `mask_${Date.now()}.png`;
+                a.download = `enhanced_mask_${Date.now()}.png`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 
-                this.updateCanvasInfo('Mask downloaded');
+                this.updateCanvasInfo(`Enhanced mask downloaded (${this.clickCount} AI selections)`);
             });
             
         } catch (error) {

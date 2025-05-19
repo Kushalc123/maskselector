@@ -16,12 +16,12 @@
         <!-- Header -->
         <header class="app-header">
             <h1>AI Image Segmentation Tool</h1>
-            <p>Upload an image, click to select objects, and download the mask</p>
+            <p>Upload an image, use tools to select objects, and download the mask</p>
         </header>
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Upload Section - Full Width -->
+            <!-- Upload Section -->
             <section class="upload-section">
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-content">
@@ -38,65 +38,86 @@
                 </div>
             </section>
 
-            <!-- Workspace: Left Panel + Canvas -->
+            <!-- Workspace: Tools Above Canvas -->
             <div class="workspace" id="workspace" style="display: none;">
-                <!-- Left Panel: Tools -->
-                <aside class="tools-panel">
+                <!-- Tools Section -->
+                <section class="tools-section">
                     <div class="tools-container">
                         <!-- Tool Selection -->
                         <div class="tool-group">
                             <label>Selection Tools</label>
                             <div class="tool-buttons">
-                                <button class="tool-btn active" data-tool="click" title="Click to select">
+                                <button class="tool-btn active" data-tool="click" title="Click to select with AI">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M3 21L12 12L21 21"></path>
                                         <path d="M12 3V12"></path>
                                     </svg>
                                     AI Click Select
                                 </button>
-                                <button class="tool-btn" data-tool="brush" title="Brush tool">
+                                <button class="tool-btn" data-tool="brush" title="Brush tool to add to selection">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M9.06 11.9L8.21 20.94A1 1 0 0 1 7.21 22H5.5A1.5 1.5 0 0 1 4 20.5V18a2 2 0 0 1 2-2h2.94a2 2 0 0 1 1.94 1.5"></path>
                                         <path d="M11 11.4L18.1 4.3a2.1 2.1 0 1 1 3 3L14 14.4"></path>
                                     </svg>
-                                    Brush Tool
+                                    Add Brush
                                 </button>
-                                <button class="tool-btn" data-tool="lasso" title="Lasso tool">
+                                <button class="tool-btn" data-tool="erase" title="Eraser to remove from selection">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M20 20H7L3 16L11 8L17 14L20 11Z"></path>
+                                        <path d="M15 8L20 13"></path>
+                                    </svg>
+                                    Erase Brush
+                                </button>
+                                <button class="tool-btn" data-tool="lasso" title="Lasso tool to select areas">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <circle cx="12" cy="12" r="3"></circle>
                                         <path d="M20.4 12a8.4 8.4 0 1 1-16.8 0"></path>
                                     </svg>
-                                    Lasso Tool
+                                    Lasso Add
+                                </button>
+                                <button class="tool-btn" data-tool="lasso-erase" title="Lasso erase tool for precise deletions">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M20 20H7L3 16L11 8L17 14L20 11Z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    Lasso Erase
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Brush Size -->
+                        <!-- Brush Size - Shown for brush and erase tools -->
                         <div class="tool-group" id="brushSizeGroup" style="display: none;">
                             <label for="brushSize">Brush Size</label>
-                            <input type="range" id="brushSize" min="5" max="50" value="15">
-                            <span id="brushSizeValue">15px</span>
+                            <input type="range" id="brushSize" min="5" max="200" value="25">
+                            <span id="brushSizeValue">25px</span>
                         </div>
 
                         <!-- Selection Actions -->
                         <div class="tool-group">
-                            <label>Selection Actions</label>
+                            <label>Actions</label>
                             <div class="action-buttons">
-                                <button class="action-btn" id="undoBtn" title="Undo">
+                                <button class="action-btn" id="undoBtn" title="Undo last action">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M3 7v6h6"></path>
                                         <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
                                     </svg>
                                     Undo
                                 </button>
-                                <button class="action-btn" id="redoBtn" title="Redo">
+                                <button class="action-btn" id="redoBtn" title="Redo last action">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M21 7v6h-6"></path>
                                         <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
                                     </svg>
                                     Redo
                                 </button>
-                                <button class="action-btn" id="clearBtn" title="Clear selection">
+                                <button class="action-btn" id="invertBtn" title="Invert selection">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                                    </svg>
+                                    Invert Mask
+                                </button>
+                                <button class="action-btn" id="clearBtn" title="Clear all selection">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <polyline points="3,6 5,6 21,6"></polyline>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
@@ -104,7 +125,7 @@
                                     </svg>
                                     Clear All
                                 </button>
-                                <button class="action-btn" id="refineBtn" title="Refine edges">
+                                <button class="action-btn" id="refineBtn" title="Refine edge quality">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <path d="M12 5v14"></path>
                                         <path d="M5 12h14"></path>
@@ -115,7 +136,7 @@
                             </div>
                         </div>
 
-                        <!-- Download -->
+                        <!-- Export -->
                         <div class="tool-group">
                             <label>Export</label>
                             <button class="download-btn" id="downloadBtn">
@@ -128,21 +149,24 @@
                             </button>
                         </div>
                     </div>
-                </aside>
+                </section>
 
-                <!-- Right Side: Canvas Area -->
-                <main class="canvas-area">
-                    <section class="canvas-section" id="canvasSection">
-                        <div class="canvas-container">
-                            <canvas id="imageCanvas"></canvas>
-                            <canvas id="maskCanvas"></canvas>
-                            <canvas id="overlayCanvas"></canvas>
+                <!-- Canvas Section -->
+                <section class="canvas-section" id="canvasSection">
+                    <div class="canvas-container">
+                        <canvas id="imageCanvas"></canvas>
+                        <canvas id="maskCanvas"></canvas>
+                        <canvas id="overlayCanvas"></canvas>
+                        <!-- Magnifier for precision tools -->
+                        <div class="magnifier" id="magnifier" style="display: none;">
+                            <canvas id="magnifierCanvas"></canvas>
+                            <div class="magnifier-crosshair"></div>
                         </div>
-                        <div class="canvas-info">
-                            <span id="canvasInfo">Ready to process...</span>
-                        </div>
-                    </section>
-                </main>
+                    </div>
+                    <div class="canvas-info">
+                        <span id="canvasInfo">Ready to process...</span>
+                    </div>
+                </section>
             </div>
         </main>
 

@@ -1,4 +1,4 @@
-// js/tools.js - Interactive tools for mask editing (brush, lasso, etc.)
+// js/tools.js - Interactive tools for mask editing with magnifier
 
 class MaskTools {
     constructor(canvasContainer, maskCanvas, overlayCanvas) {
@@ -8,9 +8,20 @@ class MaskTools {
         this.maskCtx = maskCanvas.getContext('2d');
         this.overlayCtx = overlayCanvas.getContext('2d');
         
+        // Magnifier setup
+        this.magnifier = document.getElementById('magnifier');
+        this.magnifierCanvas = document.getElementById('magnifierCanvas');
+        this.magnifierCtx = this.magnifierCanvas ? this.magnifierCanvas.getContext('2d') : null;
+        this.magnifierSize = 120;
+        this.magnificationLevel = 3; // 3x zoom
+        if (this.magnifierCanvas) {
+            this.magnifierCanvas.width = this.magnifierSize;
+            this.magnifierCanvas.height = this.magnifierSize;
+        }
+        
         // Tool state
         this.currentTool = 'click';
-        this.brushSize = 15;
+        this.brushSize = 25;
         this.isDrawing = false;
         this.isDragging = false;
         
@@ -48,7 +59,19 @@ class MaskTools {
         this.overlayCanvas.addEventListener('mousedown', this.handlePointerDown);
         this.overlayCanvas.addEventListener('mousemove', this.handlePointerMove);
         this.overlayCanvas.addEventListener('mouseup', this.handlePointerUp);
-        this.overlayCanvas.addEventListener('mouseleave', this.handlePointerUp);
+        this.overlayCanvas.addEventListener('mouseleave', (e) => {
+            this.handlePointerUp();
+            // Hide magnifier when leaving canvas
+            if (['brush', 'erase', 'lasso', 'lasso-erase'].includes(this.currentTool)) {
+                this.hideMagnifier();
+            }
+        });
+        this.overlayCanvas.addEventListener('mouseenter', () => {
+            // Show magnifier when entering canvas with precision tools
+            if (['brush', 'erase', 'lasso', 'lasso-erase'].includes(this.currentTool)) {
+                this.showMagnifier();
+            }
+        });
         this.overlayCanvas.addEventListener('dblclick', this.handleDoubleClick);
         
         // Touch events for mobile support
@@ -106,7 +129,7 @@ class MaskTools {
      * Handle double-click events (for lasso completion)
      */
     handleDoubleClick(e) {
-        if (this.currentTool === 'lasso' && this.isLassoActive) {
+        if ((this.currentTool === 'lasso' || this.currentTool === 'lasso-erase') && this.isLassoActive) {
             this.completeLasso();
         }
     }
@@ -126,10 +149,17 @@ class MaskTools {
             case 'brush':
                 this.isDrawing = true;
                 this.lastPoint = point;
-                this.drawBrushStroke(point, isRightClick);
+                this.drawBrushStroke(point, false);
+                break;
+                
+            case 'erase':
+                this.isDrawing = true;
+                this.lastPoint = point;
+                this.drawBrushStroke(point, true);
                 break;
                 
             case 'lasso':
+            case 'lasso-erase':
                 if (!this.isLassoActive) {
                     this.startLasso(point);
                 } else {
@@ -145,18 +175,31 @@ class MaskTools {
     handlePointerMove(e) {
         const point = e.point || this.getMousePos(e);
         
+        // Update magnifier for precision tools
+        if (['brush', 'erase', 'lasso', 'lasso-erase'].includes(this.currentTool)) {
+            this.updateMagnifier(point, e);
+        }
+        
         // Update cursor preview
         this.updateCursorPreview(point);
         
         switch (this.currentTool) {
             case 'brush':
                 if (this.isDrawing && this.lastPoint) {
-                    this.drawBrushStroke(point, e.shiftKey);
+                    this.drawBrushStroke(point, false);
+                    this.lastPoint = point;
+                }
+                break;
+                
+            case 'erase':
+                if (this.isDrawing && this.lastPoint) {
+                    this.drawBrushStroke(point, true);
                     this.lastPoint = point;
                 }
                 break;
                 
             case 'lasso':
+            case 'lasso-erase':
                 if (this.isLassoActive) {
                     this.updateLassoPreview(point);
                 }
@@ -170,19 +213,21 @@ class MaskTools {
     handlePointerUp() {
         switch (this.currentTool) {
             case 'brush':
+            case 'erase':
                 if (this.isDrawing) {
                     this.isDrawing = false;
                     this.lastPoint = null;
-                    this.saveState(); // Save state after brush stroke
+                    this.saveState();
                 }
                 break;
                 
             case 'lasso':
-                // Lasso completion is handled by double-click or specific gesture
+            case 'lasso-erase':
+                // Lasso completion is handled by double-click
                 break;
         }
         
-        // Clear cursor preview
+        // Clear cursor preview but keep magnifier if precision tool is active
         this.clearCursorPreview();
     }
 
@@ -203,17 +248,21 @@ class MaskTools {
     drawBrushStroke(point, isErase = false) {
         this.maskCtx.save();
         
-        // Set drawing properties
-        this.maskCtx.globalCompositeOperation = isErase ? 'destination-out' : 'source-over';
-        this.maskCtx.fillStyle = isErase ? 'transparent' : 'white';
-        this.maskCtx.globalAlpha = 0.8;
+        if (isErase) {
+            // For erasing, remove from mask
+            this.maskCtx.globalCompositeOperation = 'destination-out';
+        } else {
+            // For adding, draw much brighter and more opaque green
+            this.maskCtx.globalCompositeOperation = 'source-over';
+            this.maskCtx.fillStyle = 'rgba(0, 255, 50, 0.95)';
+            this.maskCtx.strokeStyle = 'rgba(0, 255, 50, 0.95)';
+        }
         
         if (this.lastPoint) {
             // Draw line from last point to current point
             this.maskCtx.lineWidth = this.brushSize;
             this.maskCtx.lineCap = 'round';
             this.maskCtx.lineJoin = 'round';
-            this.maskCtx.strokeStyle = isErase ? 'transparent' : 'white';
             
             this.maskCtx.beginPath();
             this.maskCtx.moveTo(this.lastPoint.x, this.lastPoint.y);
@@ -255,11 +304,21 @@ class MaskTools {
             return;
         }
         
-        // Fill the lasso selection on mask canvas
-        this.maskCtx.save();
-        this.maskCtx.fillStyle = 'white';
-        this.maskCtx.globalAlpha = 0.8;
+        // Determine if we're adding or erasing based on tool
+        const isErase = this.currentTool === 'lasso-erase';
         
+        this.maskCtx.save();
+        
+        if (isErase) {
+            // For lasso erase, use destination-out to remove from existing mask
+            this.maskCtx.globalCompositeOperation = 'destination-out';
+        } else {
+            // For regular lasso, add much brighter and more opaque green overlay
+            this.maskCtx.globalCompositeOperation = 'source-over';
+            this.maskCtx.fillStyle = 'rgba(0, 255, 50, 0.95)';
+        }
+        
+        // Draw the lasso selection
         this.maskCtx.beginPath();
         this.maskCtx.moveTo(this.lassoPoints[0].x, this.lassoPoints[0].y);
         
@@ -293,9 +352,14 @@ class MaskTools {
         if (this.lassoPoints.length < 2) return;
         
         this.overlayCtx.save();
-        this.overlayCtx.strokeStyle = '#3b82f6';
-        this.overlayCtx.lineWidth = 2;
-        this.overlayCtx.setLineDash([5, 5]);
+        // Use different colors for different tools with much bigger lines
+        if (this.currentTool === 'lasso-erase') {
+            this.overlayCtx.strokeStyle = '#ef4444';
+        } else {
+            this.overlayCtx.strokeStyle = '#10b981';
+        }
+        this.overlayCtx.lineWidth = 6;
+        this.overlayCtx.setLineDash([12, 8]);
         
         this.overlayCtx.beginPath();
         this.overlayCtx.moveTo(this.lassoPoints[0].x, this.lassoPoints[0].y);
@@ -317,11 +381,11 @@ class MaskTools {
     updateLassoPreview(point) {
         this.drawLassoPreview();
         
-        // Draw line to current mouse position
+        // Draw line to current mouse position with much bigger preview line
         this.overlayCtx.save();
         this.overlayCtx.strokeStyle = '#6b7280';
-        this.overlayCtx.lineWidth = 1;
-        this.overlayCtx.setLineDash([3, 3]);
+        this.overlayCtx.lineWidth = 4;
+        this.overlayCtx.setLineDash([8, 6]);
         
         this.overlayCtx.beginPath();
         const lastPoint = this.lassoPoints[this.lassoPoints.length - 1];
@@ -336,10 +400,20 @@ class MaskTools {
      */
     drawLassoPoint(point) {
         this.overlayCtx.save();
-        this.overlayCtx.fillStyle = '#3b82f6';
+        // Use different colors for different tools with much bigger dots
+        if (this.currentTool === 'lasso-erase') {
+            this.overlayCtx.fillStyle = '#ef4444';
+        } else {
+            this.overlayCtx.fillStyle = '#10b981';
+        }
         this.overlayCtx.beginPath();
-        this.overlayCtx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+        this.overlayCtx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
         this.overlayCtx.fill();
+        
+        // Add white outline for better visibility
+        this.overlayCtx.strokeStyle = '#ffffff';
+        this.overlayCtx.lineWidth = 2;
+        this.overlayCtx.stroke();
         this.overlayCtx.restore();
     }
 
@@ -347,11 +421,12 @@ class MaskTools {
      * Update cursor preview based on current tool
      */
     updateCursorPreview(point) {
-        if (this.currentTool === 'brush') {
+        if (this.currentTool === 'brush' || this.currentTool === 'erase') {
             this.clearOverlay();
             
             this.overlayCtx.save();
-            this.overlayCtx.strokeStyle = '#3b82f6';
+            // Use different colors for brush and erase preview
+            this.overlayCtx.strokeStyle = this.currentTool === 'erase' ? '#ef4444' : '#10b981';
             this.overlayCtx.lineWidth = 2;
             this.overlayCtx.setLineDash([]);
             
@@ -366,7 +441,7 @@ class MaskTools {
      * Clear cursor preview
      */
     clearCursorPreview() {
-        if (this.currentTool === 'brush' && !this.isDrawing) {
+        if ((this.currentTool === 'brush' || this.currentTool === 'erase') && !this.isDrawing) {
             this.clearOverlay();
         }
     }
@@ -383,20 +458,27 @@ class MaskTools {
      */
     setTool(tool) {
         // Complete any active lasso before switching tools
-        if (this.currentTool === 'lasso' && this.isLassoActive) {
+        if ((this.currentTool === 'lasso' || this.currentTool === 'lasso-erase') && this.isLassoActive) {
             this.cancelLasso();
         }
         
         this.currentTool = tool;
         this.updateCursor();
         this.clearOverlay();
+        
+        // Show/hide magnifier based on tool
+        if (['brush', 'erase', 'lasso', 'lasso-erase'].includes(tool)) {
+            this.showMagnifier();
+        } else {
+            this.hideMagnifier();
+        }
     }
 
     /**
-     * Set brush size
+     * Set brush size with wider range
      */
     setBrushSize(size) {
-        this.brushSize = Math.max(1, Math.min(100, size));
+        this.brushSize = Math.max(5, Math.min(200, size));
     }
 
     /**
@@ -405,6 +487,123 @@ class MaskTools {
     updateCursor() {
         this.canvasContainer.className = this.canvasContainer.className
             .replace(/tool-\w+/g, '') + ` tool-${this.currentTool}`;
+    }
+
+    /**
+     * Show magnifier for precision tools
+     */
+    showMagnifier() {
+        if (this.magnifier) {
+            this.magnifier.style.display = 'block';
+        }
+    }
+
+    /**
+     * Hide magnifier
+     */
+    hideMagnifier() {
+        if (this.magnifier) {
+            this.magnifier.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update magnifier position and content
+     */
+    updateMagnifier(point, event) {
+        if (!this.magnifier || !this.magnifierCtx || this.magnifier.style.display === 'none') return;
+        
+        // Get the actual mouse position relative to the viewport
+        const rect = this.overlayCanvas.getBoundingClientRect();
+        const clientX = event.clientX || (event.point ? rect.left + (point.x * rect.width / this.overlayCanvas.width) : rect.left + rect.width / 2);
+        const clientY = event.clientY || (event.point ? rect.top + (point.y * rect.height / this.overlayCanvas.height) : rect.top + rect.height / 2);
+        
+        // Position magnifier offset from cursor
+        const offset = 80;
+        let magnifierX = clientX + offset;
+        let magnifierY = clientY - offset;
+        
+        // Keep magnifier within viewport bounds
+        if (magnifierX + this.magnifierSize > window.innerWidth) {
+            magnifierX = clientX - offset - this.magnifierSize;
+        }
+        if (magnifierY < 0) {
+            magnifierY = clientY + offset;
+        }
+        if (magnifierY + this.magnifierSize > window.innerHeight) {
+            magnifierY = clientY - offset - this.magnifierSize;
+        }
+        
+        // Set magnifier position
+        this.magnifier.style.left = magnifierX + 'px';
+        this.magnifier.style.top = magnifierY + 'px';
+        
+        // Update magnifier content
+        this.drawMagnifiedView(point);
+    }
+
+    /**
+     * Draw magnified view of the area around the cursor
+     */
+    drawMagnifiedView(point) {
+        if (!this.magnifierCtx) return;
+        
+        const sourceSize = this.magnifierSize / this.magnificationLevel;
+        const halfSize = sourceSize / 2;
+        
+        // Calculate source area to capture
+        const sourceX = Math.max(0, point.x - halfSize);
+        const sourceY = Math.max(0, point.y - halfSize);
+        const sourceWidth = Math.min(sourceSize, this.overlayCanvas.width - sourceX);
+        const sourceHeight = Math.min(sourceSize, this.overlayCanvas.height - sourceY);
+        
+        // Clear magnifier canvas
+        this.magnifierCtx.clearRect(0, 0, this.magnifierSize, this.magnifierSize);
+        
+        // Create composite canvas with all layers
+        const compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = this.overlayCanvas.width;
+        compositeCanvas.height = this.overlayCanvas.height;
+        const compositeCtx = compositeCanvas.getContext('2d');
+        
+        // Draw image layer
+        const imageCanvas = document.getElementById('imageCanvas');
+        if (imageCanvas) {
+            compositeCtx.drawImage(imageCanvas, 0, 0);
+        }
+        
+        // Draw mask layer with reduced opacity
+        compositeCtx.globalAlpha = 0.6;
+        compositeCtx.globalCompositeOperation = 'screen';
+        compositeCtx.drawImage(this.maskCanvas, 0, 0);
+        
+        // Draw overlay layer
+        compositeCtx.globalAlpha = 1.0;
+        compositeCtx.globalCompositeOperation = 'source-over';
+        compositeCtx.drawImage(this.overlayCanvas, 0, 0);
+        
+        // Draw the magnified portion
+        this.magnifierCtx.imageSmoothingEnabled = false; // Keep crisp pixels
+        this.magnifierCtx.drawImage(
+            compositeCanvas,
+            sourceX, sourceY, sourceWidth, sourceHeight,
+            0, 0, this.magnifierSize, this.magnifierSize
+        );
+        
+        // Draw brush preview circle if brush tool is active
+        if (this.currentTool === 'brush' || this.currentTool === 'erase') {
+            const centerX = this.magnifierSize / 2;
+            const centerY = this.magnifierSize / 2;
+            const brushRadius = (this.brushSize / 2) * this.magnificationLevel;
+            
+            this.magnifierCtx.strokeStyle = this.currentTool === 'erase' ? '#ef4444' : '#10b981';
+            this.magnifierCtx.lineWidth = 2;
+            this.magnifierCtx.setLineDash([4, 4]);
+            this.magnifierCtx.beginPath();
+            this.magnifierCtx.arc(centerX, centerY, brushRadius, 0, 2 * Math.PI);
+            this.magnifierCtx.stroke();
+            this.magnifierCtx.setLineDash([]);
+        }
     }
 
     /**
@@ -467,27 +666,27 @@ class MaskTools {
     }
 
     /**
-     * Apply AI segmentation result to mask with green overlay
+     * Apply AI segmentation result to mask
      */
     applySegmentation(imageData, additive = true) {
         if (!additive) {
             this.clearMask();
         }
         
-        this.maskCtx.save();
-        
-        // Create temporary canvas for the segmentation
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = imageData.width;
-        tempCanvas.height = imageData.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        // Convert white mask to green for display
+        // Convert white mask to much brighter green for display
         const greenImageData = this.convertToGreenOverlay(imageData);
+        
+        this.maskCtx.save();
+        this.maskCtx.globalCompositeOperation = additive ? 'lighter' : 'source-over';
+        
+        // Create temporary canvas
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = greenImageData.width;
+        tempCanvas.height = greenImageData.height;
+        const tempCtx = tempCanvas.getContext('2d');
         tempCtx.putImageData(greenImageData, 0, 0);
         
-        // Apply to mask canvas
-        this.maskCtx.globalCompositeOperation = additive ? 'lighter' : 'source-over';
+        // Draw to mask canvas
         this.maskCtx.drawImage(tempCanvas, 0, 0);
         this.maskCtx.restore();
         
@@ -495,18 +694,17 @@ class MaskTools {
     }
 
     /**
-     * Convert white mask to green overlay for display
+     * Convert white mask to bright green overlay for display
      */
     convertToGreenOverlay(imageData) {
         const data = new Uint8ClampedArray(imageData.data);
         
         for (let i = 0; i < data.length; i += 4) {
-            const alpha = data[i + 3];
             if (data[i] > 128) { // If white (selected)
-                data[i] = 0;     // R - no red
-                data[i + 1] = 255; // G - full green
-                data[i + 2] = 0;   // B - no blue
-                data[i + 3] = 180; // A - semi-transparent green
+                data[i] = 0;       // R - no red
+                data[i + 1] = 255; // G - full bright green
+                data[i + 2] = 50;  // B - slight blue for better visibility
+                data[i + 3] = 240; // A - much more opaque
             } else {
                 data[i + 3] = 0; // Fully transparent for non-selected areas
             }
@@ -604,11 +802,13 @@ class MaskTools {
      * Dispose of resources
      */
     dispose() {
+        // Hide magnifier
+        this.hideMagnifier();
+        
         // Remove event listeners
         this.overlayCanvas.removeEventListener('mousedown', this.handlePointerDown);
         this.overlayCanvas.removeEventListener('mousemove', this.handlePointerMove);
         this.overlayCanvas.removeEventListener('mouseup', this.handlePointerUp);
-        this.overlayCanvas.removeEventListener('mouseleave', this.handlePointerUp);
         this.overlayCanvas.removeEventListener('dblclick', this.handleDoubleClick);
         this.overlayCanvas.removeEventListener('touchstart', this.handleTouchStart);
         this.overlayCanvas.removeEventListener('touchmove', this.handleTouchMove);

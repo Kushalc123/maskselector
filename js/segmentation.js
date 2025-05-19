@@ -1,10 +1,14 @@
-// js/segmentation.js - AI segmentation module using TensorFlow.js DeepLab
+// js/segmentation.js - Improved AI segmentation using core DeepLab only
 
 class ImageSegmentation {
     constructor() {
         this.model = null;
         this.isModelLoaded = false;
         this.loadingPromise = null;
+        
+        // Cache for performance
+        this.lastImageData = null;
+        this.lastSegmentation = null;
     }
 
     /**
@@ -48,38 +52,6 @@ class ImageSegmentation {
     }
 
     /**
-     * Resize ImageData to target dimensions
-     * @private
-     * @param {ImageData} imageData - Source image data
-     * @param {number} targetWidth - Target width
-     * @param {number} targetHeight - Target height
-     * @returns {ImageData} Resized image data
-     */
-    _resizeImageData(imageData, targetWidth, targetHeight) {
-        // Create temporary canvas for resizing
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = imageData.width;
-        tempCanvas.height = imageData.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        // Put original data on canvas
-        tempCtx.putImageData(imageData, 0, 0);
-        
-        // Create target canvas
-        const targetCanvas = document.createElement('canvas');
-        targetCanvas.width = targetWidth;
-        targetCanvas.height = targetHeight;
-        const targetCtx = targetCanvas.getContext('2d');
-        
-        // Draw resized image
-        targetCtx.imageSmoothingEnabled = false; // Preserve sharp edges for segmentation
-        targetCtx.drawImage(tempCanvas, 0, 0, targetWidth, targetHeight);
-        
-        // Get resized image data
-        return targetCtx.getImageData(0, 0, targetWidth, targetHeight);
-    }
-
-    /**
      * Warm up the model to improve initial inference performance
      * @private
      */
@@ -113,6 +85,16 @@ class ImageSegmentation {
         try {
             console.log('Starting image segmentation...');
             
+            // Get image data for caching
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Check if we already processed this exact image
+            if (this.lastImageData && this._imageDataEqual(imageData, this.lastImageData)) {
+                console.log('Using cached segmentation result');
+                return this.lastSegmentation;
+            }
+            
             // Convert canvas to tensor
             const imageTensor = tf.browser.fromPixels(canvas);
             console.log('Input image tensor shape:', imageTensor.shape);
@@ -124,8 +106,14 @@ class ImageSegmentation {
             // Clean up input tensor
             imageTensor.dispose();
             
-            // Process the results based on what we actually get
-            return this._processSegmentationResult(predictions, canvas.width, canvas.height);
+            // Process the results
+            const result = await this._processSegmentationResult(predictions, canvas.width, canvas.height);
+            
+            // Cache the results
+            this.lastImageData = imageData;
+            this.lastSegmentation = result;
+            
+            return result;
             
         } catch (error) {
             console.error('Segmentation failed:', error);
@@ -134,55 +122,65 @@ class ImageSegmentation {
     }
 
     /**
+     * Check if two ImageData objects are equal
+     * @private
+     */
+    _imageDataEqual(data1, data2) {
+        if (data1.width !== data2.width || data1.height !== data2.height) {
+            return false;
+        }
+        
+        // Sample a few pixels for quick comparison
+        const sampleIndices = [0, Math.floor(data1.data.length / 4), data1.data.length - 4];
+        for (const idx of sampleIndices) {
+            for (let i = 0; i < 4; i++) {
+                if (data1.data[idx + i] !== data2.data[idx + i]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Process segmentation results from DeepLab model
      * @private
-     * @param {Object} predictions - Raw predictions from model
-     * @param {number} width - Target width
-     * @param {number} height - Target height
-     * @returns {Promise<Object>} Processed segmentation data
      */
     async _processSegmentationResult(predictions, width, height) {
         // Debug what we actually received
         console.log('Processing segmentation result:', Object.keys(predictions));
         
-        // Check if we have segmentationMap as Uint8ClampedArray (common with newer DeepLab)
+        // Check if we have segmentationMap as Uint8ClampedArray
         if (predictions.segmentationMap && 
             (predictions.segmentationMap instanceof Uint8ClampedArray || 
              predictions.segmentationMap instanceof Uint8Array ||
              Array.isArray(predictions.segmentationMap))) {
             
             console.log('Found segmentationMap as array data');
-            console.log('Array length:', predictions.segmentationMap.length);
-            console.log('Provided dimensions:', predictions.width, 'x', predictions.height);
-            
-            // Extract dimensions from predictions or use provided width/height
             const segWidth = predictions.width || width;
             const segHeight = predictions.height || height;
             
             // Create ImageData from the array
             const imageData = new ImageData(segWidth, segHeight);
             
-            // If the array is already RGBA format
             if (predictions.segmentationMap.length === segWidth * segHeight * 4) {
                 imageData.data.set(predictions.segmentationMap);
             } else {
-                // If it's just class indices, convert to RGBA
+                // Convert class indices to binary mask
                 const segData = predictions.segmentationMap;
                 for (let i = 0; i < segData.length; i++) {
                     const pixelIndex = i * 4;
                     const classValue = segData[i];
                     
-                    // Convert class to grayscale (0 = background = black, >0 = white)
-                    const grayValue = classValue > 0 ? 255 : 0;
-                    
-                    imageData.data[pixelIndex] = grayValue;     // R
-                    imageData.data[pixelIndex + 1] = grayValue; // G
-                    imageData.data[pixelIndex + 2] = grayValue; // B
-                    imageData.data[pixelIndex + 3] = 255;       // A
+                    // Store original class value for better selection
+                    imageData.data[pixelIndex] = classValue;     // R stores class
+                    imageData.data[pixelIndex + 1] = classValue; // G stores class
+                    imageData.data[pixelIndex + 2] = classValue; // B stores class
+                    imageData.data[pixelIndex + 3] = 255;        // A
                 }
             }
             
-            // Resize to target dimensions if needed
+            // Resize if needed
             let finalImageData = imageData;
             if (segWidth !== width || segHeight !== height) {
                 finalImageData = this._resizeImageData(imageData, width, height);
@@ -190,39 +188,26 @@ class ImageSegmentation {
             
             return {
                 imageData: finalImageData,
+                segmentationMap: predictions.segmentationMap,
                 legend: predictions.legend || null,
                 width: width,
                 height: height
             };
         }
         
-        // Log all properties to understand the structure
-        for (const key in predictions) {
-            const value = predictions[key];
-            console.log(`${key}:`, value, 'type:', typeof value, 'isTensor:', value && typeof value.shape !== 'undefined');
-            if (value && typeof value.shape !== 'undefined') {
-                console.log(`  - shape: [${value.shape.join(', ')}], rank: ${value.rank}`);
-            }
-        }
-        
+        // Handle tensor-based results
         let segmentationTensor = null;
-        
-        // Try to find tensor-based segmentation data
         if (predictions.segmentationMap && typeof predictions.segmentationMap.shape !== 'undefined') {
-            console.log('Found segmentationMap tensor');
             segmentationTensor = predictions.segmentationMap;
         } else if (predictions.segmentation && typeof predictions.segmentation.shape !== 'undefined') {
-            console.log('Found segmentation tensor');
             segmentationTensor = predictions.segmentation;
         } else if (predictions.prediction && typeof predictions.prediction.shape !== 'undefined') {
-            console.log('Found prediction tensor');
             segmentationTensor = predictions.prediction;
         } else {
             // Look for any tensor-like property
             for (const key in predictions) {
                 const value = predictions[key];
                 if (value && typeof value.shape !== 'undefined' && value.shape.length >= 2) {
-                    console.log(`Using tensor from property: ${key}`);
                     segmentationTensor = value;
                     break;
                 }
@@ -230,15 +215,12 @@ class ImageSegmentation {
         }
         
         if (!segmentationTensor) {
-            // Last resort - try to use the predictions directly if it's a tensor
             if (predictions && typeof predictions.shape !== 'undefined') {
                 segmentationTensor = predictions;
             } else {
-                throw new Error('Could not find segmentation data in model predictions. Available keys: ' + Object.keys(predictions).join(', '));
+                throw new Error('Could not find segmentation data in model predictions');
             }
         }
-        
-        console.log('Using segmentation tensor:', segmentationTensor.shape);
         
         // Convert tensor to ImageData
         const segmentationData = await this._tensorToImageData(segmentationTensor, width, height);
@@ -253,12 +235,31 @@ class ImageSegmentation {
     }
 
     /**
+     * Resize ImageData to target dimensions
+     * @private
+     */
+    _resizeImageData(imageData, targetWidth, targetHeight) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = imageData.width;
+        tempCanvas.height = imageData.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        const targetCanvas = document.createElement('canvas');
+        targetCanvas.width = targetWidth;
+        targetCanvas.height = targetHeight;
+        const targetCtx = targetCanvas.getContext('2d');
+        
+        targetCtx.imageSmoothingEnabled = false;
+        targetCtx.drawImage(tempCanvas, 0, 0, targetWidth, targetHeight);
+        
+        return targetCtx.getImageData(0, 0, targetWidth, targetHeight);
+    }
+
+    /**
      * Convert tensor to ImageData format
      * @private
-     * @param {tf.Tensor} tensor - Segmentation tensor
-     * @param {number} width - Target width
-     * @param {number} height - Target height
-     * @returns {Promise<ImageData>} Converted ImageData
      */
     async _tensorToImageData(tensor, width, height) {
         if (!tensor || typeof tensor.shape === 'undefined') {
@@ -272,7 +273,6 @@ class ImageSegmentation {
             
             // Handle different tensor shapes
             if (tensor.rank === 1) {
-                // Reshape 1D tensor to 2D
                 const totalPixels = height * width;
                 if (tensor.shape[0] === totalPixels) {
                     processedTensor = tensor.reshape([height, width]);
@@ -280,19 +280,14 @@ class ImageSegmentation {
                     throw new Error(`Cannot reshape 1D tensor of size ${tensor.shape[0]} to ${height}x${width}`);
                 }
             } else if (tensor.rank === 3) {
-                // Remove single dimensions (squeeze)
                 processedTensor = tensor.squeeze();
             } else if (tensor.rank === 4) {
-                // Remove batch dimension and potentially channel dimension
                 processedTensor = tensor.squeeze();
             }
-            
-            console.log('Processed tensor shape:', processedTensor.shape);
             
             // Resize to target dimensions if needed
             let resizedTensor = processedTensor;
             if (processedTensor.shape[0] !== height || processedTensor.shape[1] !== width) {
-                // Add channel dimension for resize
                 const expandedTensor = processedTensor.expandDims(-1);
                 resizedTensor = tf.image.resizeBilinear(expandedTensor, [height, width], true);
                 resizedTensor = resizedTensor.squeeze(-1);
@@ -302,22 +297,20 @@ class ImageSegmentation {
             // Convert to array
             const segmentationArray = await resizedTensor.data();
             
-            // Create RGBA ImageData
+            // Create ImageData storing class values
             const imageData = new ImageData(width, height);
             const data = imageData.data;
             
-            // Convert class labels to binary mask (0 or 255)
+            // Store class values directly (not binary)
             for (let i = 0; i < segmentationArray.length; i++) {
                 const pixelIndex = i * 4;
                 const classValue = segmentationArray[i];
                 
-                // Create binary mask: background (class 0) = black, everything else = white
-                const maskValue = classValue > 0 ? 255 : 0;
-                
-                data[pixelIndex] = maskValue;     // R
-                data[pixelIndex + 1] = maskValue; // G
-                data[pixelIndex + 2] = maskValue; // B
-                data[pixelIndex + 3] = 255;       // A
+                // Store class value in all channels for consistency
+                data[pixelIndex] = classValue;     // R
+                data[pixelIndex + 1] = classValue; // G
+                data[pixelIndex + 2] = classValue; // B
+                data[pixelIndex + 3] = 255;        // A
             }
             
             // Clean up tensors
@@ -336,56 +329,83 @@ class ImageSegmentation {
     }
 
     /**
-     * Create a binary mask for a specific class at clicked point
-     * @param {ImageData} segmentationData - Segmentation data
+     * Create a binary mask using connected components analysis only
+     * @param {Object} segmentationResult - Segmentation result
      * @param {number} clickX - X coordinate of click
      * @param {number} clickY - Y coordinate of click
      * @returns {ImageData} Binary mask for the clicked object
      */
-    createClickMask(segmentationData, clickX, clickY) {
-        const width = segmentationData.width;
-        const height = segmentationData.height;
-        const data = segmentationData.data;
+    createClickMask(segmentationResult, clickX, clickY) {
+        const imageData = segmentationResult.imageData;
+        const width = imageData.width;
+        const height = imageData.height;
+        const data = imageData.data;
+        
+        console.log(`AI Click at: ${clickX}, ${clickY}`);
         
         // Get the class at the clicked point
         const pixelIndex = (Math.floor(clickY) * width + Math.floor(clickX)) * 4;
         const clickedClass = data[pixelIndex];
         
-        console.log(`Clicked class value: ${clickedClass} at position (${clickX}, ${clickY})`);
+        console.log(`Clicked class value: ${clickedClass}`);
         
-        // Create new mask for just this class
+        // Create mask for the clicked class using connected components
         const maskData = new ImageData(width, height);
         const maskArray = maskData.data;
         
-        // Handle different segmentation data formats
         if (clickedClass === 0) {
-            // Clicked on background - select nothing
+            // Clicked on background - create empty mask
             console.log('Clicked on background, creating empty mask');
             for (let i = 0; i < maskArray.length; i += 4) {
-                maskArray[i] = 0;       // R
-                maskArray[i + 1] = 0;   // G
-                maskArray[i + 2] = 0;   // B
-                maskArray[i + 3] = 255; // A
+                maskArray[i] = 0;
+                maskArray[i + 1] = 0;
+                maskArray[i + 2] = 0;
+                maskArray[i + 3] = 255;
             }
         } else {
-            // Clicked on an object - select all pixels of same class
-            console.log('Clicked on object, creating class mask');
-            for (let i = 0; i < data.length; i += 4) {
-                const classValue = data[i];
-                
-                // For binary segmentation (like person vs background)
-                // Select all non-background pixels
-                const isTargetClass = classValue > 0;
-                
-                const maskValue = isTargetClass ? 255 : 0;
-                maskArray[i] = maskValue;     // R
-                maskArray[i + 1] = maskValue; // G
-                maskArray[i + 2] = maskValue; // B
-                maskArray[i + 3] = 255;       // A
-            }
+            // Find connected component of the clicked class
+            console.log('Finding connected component for class:', clickedClass);
+            this._findConnectedComponent(data, maskArray, width, height, Math.floor(clickX), Math.floor(clickY), clickedClass);
         }
         
         return maskData;
+    }
+
+    /**
+     * Find connected component using flood fill starting from click point
+     * @private
+     */
+    _findConnectedComponent(data, maskArray, width, height, startX, startY, targetClass) {
+        const visited = new Set();
+        const queue = [[startX, startY]];
+        
+        while (queue.length > 0) {
+            const [x, y] = queue.shift();
+            
+            if (x < 0 || x >= width || y < 0 || y >= height) continue;
+            
+            const idx = y * width + x;
+            const pixelIdx = idx * 4;
+            
+            if (visited.has(idx)) continue;
+            visited.add(idx);
+            
+            // Check if this pixel has the target class
+            const pixelClass = data[pixelIdx];
+            if (pixelClass === targetClass) {
+                // Add to mask
+                maskArray[pixelIdx] = 255;
+                maskArray[pixelIdx + 1] = 255;
+                maskArray[pixelIdx + 2] = 255;
+                maskArray[pixelIdx + 3] = 255;
+                
+                // Add 4-connected neighbors to queue
+                queue.push([x + 1, y]);
+                queue.push([x - 1, y]);
+                queue.push([x, y + 1]);
+                queue.push([x, y - 1]);
+            }
+        }
     }
 
     /**
@@ -397,6 +417,7 @@ class ImageSegmentation {
             isLoaded: this.isModelLoaded,
             modelType: 'DeepLab v3',
             baseModel: 'Pascal VOC',
+            features: ['Connected Components'],
             supportedClasses: [
                 'background', 'aeroplane', 'bicycle', 'bird', 'boat', 
                 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 
@@ -416,6 +437,10 @@ class ImageSegmentation {
             this.isModelLoaded = false;
             console.log('Segmentation model disposed');
         }
+        
+        // Clear caches
+        this.lastImageData = null;
+        this.lastSegmentation = null;
     }
 }
 
